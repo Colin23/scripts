@@ -10,7 +10,7 @@ set -e
 AWS_CLI_URL="https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
 AWS_CLI_ZIP="awscliv2.zip"
 AWS_CLI_SIG="awscliv2.sig"
-AWS_CLI_DIR="aws"
+AWS_CLI_DIR="aws-cli-installer-$(date +%s)"
 INSTALL_DIR="/usr/local/aws-cli"
 BIN_DIR="/usr/local/bin"
 
@@ -19,8 +19,13 @@ cleanup() {
     echo "Cleaning up temporary files..."
     # Remove downloaded files
     rm -f "$AWS_CLI_ZIP" "$AWS_CLI_SIG"
-    # Remove extracted directory
-    rm -rf "$AWS_CLI_DIR"
+    # Remove extracted directory only if it exists and was created by us
+    if [ -d "$AWS_CLI_DIR" ] && [ -f "$AWS_CLI_DIR/aws/install" ]; then
+        echo "Removing extracted directory: $AWS_CLI_DIR"
+        rm -rf "$AWS_CLI_DIR"
+    else
+        echo "Directory not found or not our installer directory, skipping: $AWS_CLI_DIR"
+    fi
     # Remove public key file if it exists
     rm -f "aws-cli-pubkey.asc"
     echo "Cleanup completed."
@@ -114,14 +119,14 @@ EOF
 
 install_aws_cli() {
     echo "[Install/Update AWS CLI] Extracting AWS CLI..."
-    unzip -u "$AWS_CLI_ZIP"
+    unzip -d "$AWS_CLI_DIR" "$AWS_CLI_ZIP"
 
     if command_exists aws; then
         echo "[Install/Update AWS CLI] Updating the AWS CLI..."
-        sudo "./$AWS_CLI_DIR/install" -i "$INSTALL_DIR" -b "$BIN_DIR" --update
+        sudo "./$AWS_CLI_DIR/aws/install" -i "$INSTALL_DIR" -b "$BIN_DIR" --update
     else
         echo "[Install/Update AWS CLI] Installing the AWS CLI..."
-        sudo "./$AWS_CLI_DIR/install" -i "$INSTALL_DIR" -b "$BIN_DIR"
+        sudo "./$AWS_CLI_DIR/aws/install" -i "$INSTALL_DIR" -b "$BIN_DIR"
     fi
 }
 
