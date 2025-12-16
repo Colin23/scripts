@@ -1,2 +1,2 @@
-# scripts
-Random collection of useful scrpts
+# Scripts
+Random collection of useful scripts

@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+
+# AWS CLI Uninstallation Script
+# This script removes AWS CLI from the system
+
+# Function to safely remove a file or directory
+remove_item() {
+    local item="$1"
+    local item_type="$2"  # "file" or "dir"
+
+    if [ -z "$item" ]; then
+        echo "Error: No item specified for removal"
+        return 1
+    fi
+
+    if [ "$item_type" = "file" ]; then
+        if [ -f "$item" ]; then
+            echo "Removing file: $item"
+            sudo rm -f "$item"
+        else
+            echo "File not found, skipping: $item"
+        fi
+    elif [ "$item_type" = "dir" ]; then
+        if [ -d "$item" ]; then
+            echo "Removing directory: $item"
+            sudo rm -rf "$item"
+        else
+            echo "Directory not found, skipping: $item"
+        fi
+    else
+        echo "Error: Invalid item type specified: $item_type"
+        return 1
+    fi
+}
+
+# Main uninstallation process
+echo "Starting AWS CLI uninstallation..."
+
+# Remove AWS CLI installation directory
+remove_item "/usr/local/aws-cli" "dir"
+
+# Remove older AWS directory (if it exists)
+remove_item "/usr/local/aws" "dir"
+
+# Remove AWS CLI binary
+remove_item "/usr/local/bin/aws" "file"
+
+# Check if AWS CLI is still installed
+if command -v aws &> /dev/null; then
+    echo "Warning: AWS CLI still appears to be installed."
+    echo "The 'aws' command is still available in your PATH."
+    echo "You may need to restart your terminal or remove any remaining symlinks manually."
+else
+    echo "AWS CLI has been successfully uninstalled."
+fi
+
+# Check if there are any remaining AWS-related files
+echo "Checking for any remaining AWS-related files..."
+remaining_files=$(find /usr/local -name "*aws*" -type f -o -name "*aws*" -type d 2>/dev/null | grep -v "aws-cli" | grep -v "aws" || true)
+
+if [ -n "$remaining_files" ]; then
+    echo "The following AWS-related files/directories were found and may need manual removal:"
+    echo "$remaining_files"
+else
+    echo "No remaining AWS-related files found in /usr/local."
+fi

@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+
+# AWS CLI Installation Script
+# This script automates the download, verification, and installation of AWS CLI
+
+# Exit immediately if a command exits with a non-zero status
+set -e
+
+# Define variables
+AWS_CLI_URL="https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+AWS_CLI_ZIP="awscliv2.zip"
+AWS_CLI_SIG="awscliv2.sig"
+AWS_CLI_DIR="aws"
+INSTALL_DIR="/usr/local/aws-cli"
+BIN_DIR="/usr/local/bin"
+
+# Function to clean up temporary files
+cleanup() {
+    echo "Cleaning up temporary files..."
+    # Remove downloaded files
+    rm -f "$AWS_CLI_ZIP" "$AWS_CLI_SIG"
+    # Remove extracted directory
+    rm -rf "$AWS_CLI_DIR"
+    # Remove public key file if it exists
+    rm -f "aws-cli-pubkey.asc"
+    echo "Cleanup completed."
+}
+
+# Set trap to call cleanup function on exit or error
+trap cleanup EXIT ERR INT TERM
+
+# Function to check if command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Function to install required packages
+install_requirements() {
+    echo "[Install Requirements] Checking distribution and installing required packages..."
+
+    # Check distribution
+    if [ -f /etc/debian_version ]; then
+        # Debian/Ubuntu
+        sudo apt-get update
+        sudo apt-get install -y curl unzip gnupg
+    elif [ -f /etc/redhat-release ]; then
+        # RHEL/CentOS/Fedora
+        sudo yum install -y curl unzip gnupg2
+    elif [ -f /etc/arch-release ]; then
+        # Arch Linux
+        sudo pacman -Syu curl unzip gnupg
+    else
+        echo "[Install Requirements] Unsupported distribution. Please install curl, unzip, and gnupg manually."
+        exit 1
+    fi
+}
+
+# Function to download AWS CLI
+download_aws_cli() {
+    echo "[Download AWS CLI] Downloading..."
+    curl "$AWS_CLI_URL" -o "$AWS_CLI_ZIP"
+}
+
+# Function to verify the download
+verify_download() {
+    echo "[Verify download] Verifying download integrity..."
+
+    echo "[Verify download] Download signature file"
+    curl -o "$AWS_CLI_SIG" "${AWS_CLI_URL}.sig"
+
+    PUBLIC_KEY_FILE="aws-cli-pubkey.asc"
+    cat << EOF > "$PUBLIC_KEY_FILE"
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mQINBF2Cr7UBEADJZHcgusOJl7ENSyumXh85z0TRV0xJorM2B/JL0kHOyigQluUG
+ZMLhENaG0bYatdrKP+3H91lvK050pXwnO/R7fB/FSTouki4ciIx5OuLlnJZIxSzx
+PqGl0mkxImLNbGWoi6Lto0LYxqHN2iQtzlwTVmq9733zd3XfcXrZ3+LblHAgEt5G
+TfNxEKJ8soPLyWmwDH6HWCnjZ/aIQRBTIQ05uVeEoYxSh6wOai7ss/KveoSNBbYz
+gbdzoqI2Y8cgH2nbfgp3DSasaLZEdCSsIsK1u05CinE7k2qZ7KgKAUIcT/cR/grk
+C6VwsnDU0OUCideXcQ8WeHutqvgZH1JgKDbznoIzeQHJD238GEu+eKhRHcz8/jeG
+94zkcgJOz3KbZGYMiTh277Fvj9zzvZsbMBCedV1BTg3TqgvdX4bdkhf5cH+7NtWO
+lrFj6UwAsGukBTAOxC0l/dnSmZhJ7Z1KmEWilro/gOrjtOxqRQutlIqG22TaqoPG
+fYVN+en3Zwbt97kcgZDwqbuykNt64oZWc4XKCa3mprEGC3IbJTBFqglXmZ7l9ywG
+EEUJYOlb2XrSuPWml39beWdKM8kzr1OjnlOm6+lpTRCBfo0wa9F8YZRhHPAkwKkX
+XDeOGpWRj4ohOx0d2GWkyV5xyN14p2tQOCdOODmz80yUTgRpPVQUtOEhXQARAQAB
+tCFBV1MgQ0xJIFRlYW0gPGF3cy1jbGlAYW1hem9uLmNvbT6JAlQEEwEIAD4CGwMF
+CwkIBwIGFQoJCAsCBBYCAwECHgECF4AWIQT7Xbd/1cEYuAURraimMQrMRnJHXAUC
+aGveYQUJDMpiLAAKCRCmMQrMRnJHXKBYD/9Ab0qQdGiO5hObchG8xh8Rpb4Mjyf6
+0JrVo6m8GNjNj6BHkSc8fuTQJ/FaEhaQxj3pjZ3GXPrXjIIVChmICLlFuRXYzrXc
+Pw0lniybypsZEVai5kO0tCNBCCFuMN9RsmmRG8mf7lC4FSTbUDmxG/QlYK+0IV/l
+uJkzxWa+rySkdpm0JdqumjegNRgObdXHAQDWlubWQHWyZyIQ2B4U7AxqSpcdJp6I
+S4Zds4wVLd1WE5pquYQ8vS2cNlDm4QNg8wTj58e3lKN47hXHMIb6CHxRnb947oJa
+pg189LLPR5koh+EorNkA1wu5mAJtJvy5YMsppy2y/kIjp3lyY6AmPT1posgGk70Z
+CmToEZ5rbd7ARExtlh76A0cabMDFlEHDIK8RNUOSRr7L64+KxOUegKBfQHb9dADY
+qqiKqpCbKgvtWlds909Ms74JBgr2KwZCSY1HaOxnIr4CY43QRqAq5YHOay/mU+6w
+hhmdF18vpyK0vfkvvGresWtSXbag7Hkt3XjaEw76BzxQH21EBDqU8WJVjHgU6ru+
+DJTs+SxgJbaT3hb/vyjlw0lK+hFfhWKRwgOXH8vqducF95NRSUxtS4fpqxWVaw3Q
+V2OWSjbne99A5EPEySzryFTKbMGwaTlAwMCwYevt4YT6eb7NmFhTx0Fis4TalUs+
+j+c7Kg92pDx2uQ== =OBAt
+-----END PGP PUBLIC KEY BLOCK-----
+EOF
+
+    # Import public key
+    gpg --import "$PUBLIC_KEY_FILE"
+
+    echo "[Verify download] Verify signature"
+    gpg --verify "$AWS_CLI_SIG" "$AWS_CLI_ZIP"
+
+    # Clean up
+    rm "$PUBLIC_KEY_FILE"
+
+    echo "[Verify download] Verification successful!"
+}
+
+install_aws_cli() {
+    echo "[Install/Update AWS CLI] Extracting AWS CLI..."
+    unzip -u "$AWS_CLI_ZIP"
+
+    if command_exists aws; then
+        echo "[Install/Update AWS CLI] Updating the AWS CLI..."
+        sudo "./$AWS_CLI_DIR/install" -i "$INSTALL_DIR" -b "$BIN_DIR" --update
+    else
+        echo "[Install/Update AWS CLI] Installing the AWS CLI..."
+        sudo "./$AWS_CLI_DIR/install" -i "$INSTALL_DIR" -b "$BIN_DIR"
+    fi
+}
+
+verify_installation() {
+    echo "[Verify installation] Checking if the 'aws' command exists..."
+    if command_exists aws; then
+        aws --version
+        echo "[Verify installation] AWS CLI installed successfully!"
+    else
+        echo "[Verify installation] AWS CLI installation failed!"
+        exit 1
+    fi
+}
+
+main() {
+    echo "Starting AWS CLI installation..."
+
+    # Check if AWS CLI is already installed
+    if command_exists aws; then
+        echo "AWS CLI is already installed:"
+        aws --version
+        echo "Would you like to update it? (y/n)"
+        read -r response
+        if [[ ! "$response" =~ ^[Yy]$ ]]; then
+            exit 0
+        fi
+    fi
+
+    # Install requirements if not already installed
+    if ! command_exists curl || ! command_exists unzip || ! command_exists gpg; then
+        install_requirements
+    fi
+
+    # Download, verify, and install AWS CLI
+    download_aws_cli
+    verify_download
+    install_aws_cli
+    verify_installation
+
+    echo "AWS CLI installation completed successfully!"
+}
+
+# Run main function
+main
