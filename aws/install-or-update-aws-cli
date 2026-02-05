@@ -149,7 +149,7 @@ main() {
         echo "AWS CLI is already installed:"
         aws --version
         echo "Would you like to update it? (y/n)"
-        read -r response
+        read -r response < /dev/tty
         if [[ ! "$response" =~ ^[Yy]$ ]]; then
             exit 0
         fi
